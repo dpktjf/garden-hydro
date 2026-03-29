@@ -1,0 +1,73 @@
+{
+  "title": "DPK Garden Hydro",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up DPK Garden Hydro",
+        "description": "Configure the site-level ETo engine.",
+        "data": {
+          "site_name": "Site name",
+          "rollup_time": "Daily rollup time"
+        }
+      },
+      "weather_mapping": {
+        "title": "Weather source entities",
+        "description": "Map the site weather sensors used for the Hargreaves calculation.",
+        "data": {
+          "tmin_entity_id": "Daily minimum temperature entity",
+          "tmax_entity_id": "Daily maximum temperature entity",
+          "rain_entity_id": "Daily rainfall entity",
+          "forecast_rain_entity_id": "Forecast rainfall entity"
+        }
+      }
+    },
+    "error": {
+      "site_name_required": "Enter a site name.",
+      "tmax_must_differ": "Maximum temperature must use a different entity than minimum temperature.",
+      "entity_not_found": "The selected entity could not be found."
+    },
+    "abort": {
+      "single_instance_allowed": "Only one DPK Garden Hydro site is supported right now."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "daily_eto_mm": {"name": "Daily ETo"},
+      "daily_rain_mm": {"name": "Daily rain"},
+      "forecast_rain_mm": {"name": "Forecast rain"},
+      "last_rollup": {"name": "Last rollup"},
+      "last_calculation": {"name": "Last calculation"},
+      "calc_mode": {"name": "Calculation mode"},
+      "tmin_c": {"name": "Tmin"},
+      "tmax_c": {"name": "Tmax"},
+      "ra_used_mj_m2_day": {"name": "Ra used"},
+      "weather_status": {"name": "Weather status"}
+    },
+    "number": {
+      "ra_jan": {"name": "Ra Jan"},
+      "ra_feb": {"name": "Ra Feb"},
+      "ra_mar": {"name": "Ra Mar"},
+      "ra_apr": {"name": "Ra Apr"},
+      "ra_may": {"name": "Ra May"},
+      "ra_jun": {"name": "Ra Jun"},
+      "ra_jul": {"name": "Ra Jul"},
+      "ra_aug": {"name": "Ra Aug"},
+      "ra_sep": {"name": "Ra Sep"},
+      "ra_oct": {"name": "Ra Oct"},
+      "ra_nov": {"name": "Ra Nov"},
+      "ra_dec": {"name": "Ra Dec"}
+    }
+  },
+  "services": {
+    "recalculate_site": {
+      "name": "Recalculate site",
+      "description": "Recalculate site-level ETo immediately using the currently mapped weather entities.",
+      "fields": {
+        "entry_id": {
+          "name": "Entry ID",
+          "description": "Optional config entry ID. Leave empty to recalculate all loaded entries."
+        }
+      }
+    }
+  }
+}

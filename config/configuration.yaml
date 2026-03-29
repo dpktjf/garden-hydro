@@ -9,4 +9,4 @@ homeassistant:
 logger:
   default: info
   logs:
-    custom_components.finnhub: debug
+    custom_components.garden_hydro: debug

@@ -1,0 +1,11 @@
+recalculate_site:
+  name: Recalculate site
+  description: Recalculate site-level ETo immediately using the currently mapped weather entities.
+  fields:
+    entry_id:
+      name: Entry ID
+      description: Optional config entry ID. Leave blank to recalculate all loaded garden_hydro entries.
+      required: false
+      example: abc123def456
+      selector:
+        text:
