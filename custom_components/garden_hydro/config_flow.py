@@ -5,10 +5,8 @@ from __future__ import annotations
 from typing import Any
 
 import voluptuous as vol
-
 from homeassistant import config_entries
 from homeassistant.core import callback
-from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import selector
 
 from .const import (
@@ -36,7 +34,7 @@ class GardenHydroConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_user(
         self,
         user_input: dict[str, Any] | None = None,
-    ) -> FlowResult:
+    ) -> config_entries.ConfigFlowResult:
         """Handle the first step of the configuration flow."""
         if self._async_current_entries():
             return self.async_abort(reason="single_instance_allowed")
@@ -71,7 +69,7 @@ class GardenHydroConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_weather_mapping(
         self,
         user_input: dict[str, Any] | None = None,
-    ) -> FlowResult:
+    ) -> config_entries.ConfigFlowResult:
         """Handle the weather-entity mapping step."""
         errors: dict[str, str] = {}
         if user_input is not None:
@@ -125,10 +123,7 @@ class GardenHydroConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if self.hass.states.get(entity_id) is None:
                 errors[key] = "entity_not_found"
 
-        if (
-            forecast_entity_id
-            and self.hass.states.get(forecast_entity_id) is None
-        ):
+        if forecast_entity_id and self.hass.states.get(forecast_entity_id) is None:
             errors[CONF_FORECAST_RAIN_ENTITY_ID] = "entity_not_found"
 
         return errors

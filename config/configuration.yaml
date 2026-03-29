@@ -10,3 +10,31 @@ logger:
   default: info
   logs:
     custom_components.garden_hydro: debug
+
+template:
+
+  - sensor:
+
+      - name: "Test Garden Tmin"
+        unique_id: test_garden_tmin
+        unit_of_measurement: "°C"
+        state_class: measurement
+        state: 2.89
+
+      - name: "Test Garden Tmax"
+        unique_id: test_garden_tmax
+        unit_of_measurement: "°C"
+        state_class: measurement
+        state: 10.56
+
+      - name: "Test Garden Rain"
+        unique_id: test_garden_rain
+        unit_of_measurement: "mm"
+        state_class: measurement
+        state: 0
+
+      - name: "Test Garden Forecast Rain"
+        unique_id: test_garden_forecast_rain
+        unit_of_measurement: "mm"
+        state_class: measurement
+        state: 0

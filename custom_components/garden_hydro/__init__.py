@@ -2,14 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
-
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import config_validation as cv
 
 from .const import (
@@ -23,6 +19,12 @@ from .const import (
 from .coordinator import GardenHydroCoordinator
 from .models import RuntimeData, SiteCalculationResult
 
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+    from homeassistant.config_entries import ConfigEntry
+    from homeassistant.core import HomeAssistant, ServiceCall
+
 SERVICE_SCHEMA = vol.Schema({vol.Optional(ATTR_ENTRY_ID): cv.string})
 
 
@@ -35,7 +37,7 @@ class GardenHydroEntryData:
     coordinator: GardenHydroCoordinator
 
 
-async def async_setup(hass: HomeAssistant, config: Mapping[str, Any]) -> bool:
+async def async_setup(hass: HomeAssistant, config: Mapping[str, Any]) -> bool:  # noqa: ARG001
     """Set up the integration domain and register services."""
     hass.data.setdefault(DOMAIN, {})
 

@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.sensor import (
     RestoreSensor,
@@ -12,16 +11,21 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import UnitOfTemperature
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import DeviceInfo, EntityCategory
-from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.const import EntityCategory, UnitOfTemperature
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import CALC_MODE, DOMAIN, NAME, UNIT_MILLIMETERS, UNIT_MJ_M2_DAY
 from .coordinator import GardenHydroCoordinator
-from .models import SiteCalculationResult
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from homeassistant.config_entries import ConfigEntry
+    from homeassistant.core import HomeAssistant
+    from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+
+    from .models import SiteCalculationResult
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -117,10 +121,7 @@ async def async_setup_entry(
 ) -> None:
     """Set up Garden Hydro sensor entities for a config entry."""
     coordinator: GardenHydroCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
-    async_add_entities(
-        GardenHydroSensor(coordinator, entry, description)
-        for description in SENSOR_DESCRIPTIONS
-    )
+    async_add_entities(GardenHydroSensor(coordinator, entry, description) for description in SENSOR_DESCRIPTIONS)
 
 
 class GardenHydroSensor(CoordinatorEntity[GardenHydroCoordinator], RestoreSensor):
@@ -189,19 +190,19 @@ class GardenHydroSensor(CoordinatorEntity[GardenHydroCoordinator], RestoreSensor
             return None
 
         result = self.coordinator.data
-        attributes: dict[str, Any] = {}
-        for key, value in {
-            "tmin_c": result.tmin_c,
-            "tmax_c": result.tmax_c,
-            "tmean_c": result.tmean_c,
-            "temperature_delta_c": result.temperature_delta_c,
-            "ra_mj_m2_day": result.ra_used_mj_m2_day,
-            "source_tmin_entity_id": result.source_tmin_entity_id,
-            "source_tmax_entity_id": result.source_tmax_entity_id,
-            "calculation_date": result.calculation_date,
-            "calc_mode": result.calc_mode,
-        }.items():
-            if value is not None:
-                attributes[key] = value
 
-        return attributes or None
+        return {
+            key: value
+            for key, value in {
+                "tmin_c": result.tmin_c,
+                "tmax_c": result.tmax_c,
+                "tmean_c": result.tmean_c,
+                "temperature_delta_c": result.temperature_delta_c,
+                "ra_mj_m2_day": result.ra_used_mj_m2_day,
+                "source_tmin_entity_id": result.source_tmin_entity_id,
+                "source_tmax_entity_id": result.source_tmax_entity_id,
+                "calculation_date": result.calculation_date,
+                "calc_mode": result.calc_mode,
+            }.items()
+            if value is not None
+        }

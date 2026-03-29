@@ -3,15 +3,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-from homeassistant.components.number import NumberEntityDescription, RestoreNumber
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import DeviceInfo, EntityCategory
-from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.components.number import NumberEntityDescription, NumberMode, RestoreNumber
+from homeassistant.const import EntityCategory
+from homeassistant.helpers.device_registry import DeviceInfo
 
 from .const import DOMAIN, MONTH_KEYS, NAME, RA_DEFAULTS, UNIT_MJ_M2_DAY
-from .models import RuntimeData
+
+if TYPE_CHECKING:
+    from homeassistant.config_entries import ConfigEntry
+    from homeassistant.core import HomeAssistant
+    from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+
+    from .models import RuntimeData
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -40,10 +45,7 @@ async def async_setup_entry(
 ) -> None:
     """Set up the site-level Ra number entities."""
     runtime: RuntimeData = hass.data[DOMAIN][entry.entry_id]["runtime"]
-    async_add_entities(
-        GardenHydroRaNumber(entry, runtime, description)
-        for description in NUMBER_DESCRIPTIONS
-    )
+    async_add_entities(GardenHydroRaNumber(entry, runtime, description) for description in NUMBER_DESCRIPTIONS)
 
 
 class GardenHydroRaNumber(RestoreNumber):
@@ -73,7 +75,7 @@ class GardenHydroRaNumber(RestoreNumber):
         self._attr_entity_category = EntityCategory.CONFIG
         self._attr_translation_key = description.translation_key
         self._attr_suggested_display_precision = 1
-        self._attr_mode = "box"
+        self._attr_mode = NumberMode.BOX
         self._attr_native_value = runtime.ra_values.get(
             self._month_key,
             RA_DEFAULTS[self._month_key],
