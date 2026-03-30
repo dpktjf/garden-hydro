@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -27,6 +28,8 @@ if TYPE_CHECKING:
 
 SERVICE_SCHEMA = vol.Schema({vol.Optional(ATTR_ENTRY_ID): cv.string})
 
+_LOGGER = logging.getLogger(__name__)
+
 
 @dataclass(slots=True)
 class GardenHydroEntryData:
@@ -43,6 +46,7 @@ async def async_setup(hass: HomeAssistant, config: Mapping[str, Any]) -> bool:  
 
     async def _handle_recalculate_site(call: ServiceCall) -> None:
         """Recalculate one or more loaded site entries on demand."""
+        _LOGGER.warning("garden_hydro.recalculate_site called")
         requested_entry_id: str | None = call.data.get(ATTR_ENTRY_ID)
         targets: list[GardenHydroCoordinator] = []
 

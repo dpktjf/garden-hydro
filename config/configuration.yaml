@@ -31,10 +31,10 @@ template:
         unique_id: test_garden_rain
         unit_of_measurement: "mm"
         state_class: measurement
-        state: 0
+        state: 2
 
       - name: "Test Garden Forecast Rain"
         unique_id: test_garden_forecast_rain
         unit_of_measurement: "mm"
         state_class: measurement
-        state: 0
+        state: 3

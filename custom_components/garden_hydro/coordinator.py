@@ -21,6 +21,7 @@ from .const import (
     CONF_ROLLUP_TIME,
     CONF_TMAX_ENTITY_ID,
     CONF_TMIN_ENTITY_ID,
+    DEFAULT_ROLLUP_TIME,
     MAX_FORECAST_RAIN_MM,
     MAX_RAIN_MM,
     MAX_TEMP_C,
@@ -108,8 +109,31 @@ class GardenHydroCoordinator(DataUpdateCoordinator[SiteCalculationResult]):
     def _configured_rollup_time(self) -> time:
         """Parse and return the configured rollup time."""
         raw_time = self.config[CONF_ROLLUP_TIME]
-        hour_str, minute_str = raw_time.split(":", 1)
-        return time(hour=int(hour_str), minute=int(minute_str))
+
+        # Preferred: already a time object
+        if isinstance(raw_time, time):
+            return raw_time.replace(second=0, microsecond=0)
+
+        # String formats
+        if isinstance(raw_time, str):
+            parts = raw_time.split(":")
+
+            if len(parts) >= 2:  # noqa: PLR2004
+                try:
+                    hour = int(parts[0])
+                    minute = int(parts[1])
+
+                    return time(hour=hour, minute=minute)
+
+                except ValueError:
+                    _LOGGER.warning(
+                        "Invalid rollup_time value '%s'; using default %s",
+                        raw_time,
+                        DEFAULT_ROLLUP_TIME,
+                    )
+
+        # Fallback
+        return DEFAULT_ROLLUP_TIME
 
     async def async_run_rollup(
         self,

@@ -25,6 +25,8 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
+    from custom_components.garden_hydro import GardenHydroEntryData
+
     from .models import SiteCalculationResult
 
 
@@ -120,7 +122,8 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up Garden Hydro sensor entities for a config entry."""
-    coordinator: GardenHydroCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    entry_data: GardenHydroEntryData = hass.data[DOMAIN][entry.entry_id]
+    coordinator: GardenHydroCoordinator = entry_data.coordinator
     async_add_entities(GardenHydroSensor(coordinator, entry, description) for description in SENSOR_DESCRIPTIONS)
 
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import time
 from typing import Final
 
 DOMAIN: Final = "garden_hydro"
@@ -18,7 +19,7 @@ CONF_RAIN_ENTITY_ID: Final = "rain_entity_id"
 CONF_FORECAST_RAIN_ENTITY_ID: Final = "forecast_rain_entity_id"
 
 DEFAULT_SITE_NAME: Final = NAME
-DEFAULT_ROLLUP_TIME: Final = "03:00"
+DEFAULT_ROLLUP_TIME: Final = time(hour=3, minute=0)
 CALC_MODE: Final = "hargreaves_london_ra_blend"
 
 SERVICE_RECALCULATE_SITE: Final = "recalculate_site"

@@ -16,6 +16,8 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
+    from custom_components.garden_hydro import GardenHydroEntryData
+
     from .models import RuntimeData
 
 
@@ -44,7 +46,8 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up the site-level Ra number entities."""
-    runtime: RuntimeData = hass.data[DOMAIN][entry.entry_id]["runtime"]
+    entry_data: GardenHydroEntryData = hass.data[DOMAIN][entry.entry_id]
+    runtime: RuntimeData = entry_data.runtime
     async_add_entities(GardenHydroRaNumber(entry, runtime, description) for description in NUMBER_DESCRIPTIONS)
 
 

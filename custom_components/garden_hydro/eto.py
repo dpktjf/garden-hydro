@@ -43,7 +43,7 @@ def calculate_hargreaves_eto(
     Calculate daily reference evapotranspiration in mm/day.
 
     The Phase 1 site engine uses the reduced-data Hargreaves equation:
-    * ETo = 0.0023 × (Tmean + 17.8) × sqrt(Tmax − Tmin) × Ra
+    * ETo = 0.0023 * (Tmean + 17.8) * sqrt(Tmax - Tmin) * Ra
     """
     delta = tmax_c - tmin_c
     if delta <= 0:
