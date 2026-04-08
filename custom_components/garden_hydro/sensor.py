@@ -15,7 +15,7 @@ from homeassistant.const import EntityCategory, UnitOfTemperature
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CALC_MODE, DOMAIN, NAME, UNIT_MILLIMETERS, UNIT_MJ_M2_DAY
+from .const import DOMAIN, NAME, UNIT_MILLIMETERS, UNIT_MJ_M2_DAY
 from .coordinator import GardenHydroCoordinator
 
 if TYPE_CHECKING:
@@ -39,6 +39,22 @@ class GardenHydroSensorDescription(SensorEntityDescription):
 
 
 SENSOR_DESCRIPTIONS: tuple[GardenHydroSensorDescription, ...] = (
+    GardenHydroSensorDescription(
+        key="eto_hargreaves_mm",
+        translation_key="eto_hargreaves_mm",
+        native_unit_of_measurement=UNIT_MILLIMETERS,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda result: result.eto_hargreaves_mm,
+        round_digits=2,
+    ),
+    GardenHydroSensorDescription(
+        key="eto_penman_monteith_mm",
+        translation_key="eto_penman_monteith_mm",
+        native_unit_of_measurement=UNIT_MILLIMETERS,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda result: result.eto_penman_monteith_mm,
+        round_digits=2,
+    ),
     GardenHydroSensorDescription(
         key="daily_eto_mm",
         translation_key="daily_eto_mm",
@@ -78,7 +94,7 @@ SENSOR_DESCRIPTIONS: tuple[GardenHydroSensorDescription, ...] = (
     GardenHydroSensorDescription(
         key="calc_mode",
         translation_key="calc_mode",
-        value_fn=lambda result: result.calc_mode or CALC_MODE,
+        value_fn=lambda result: result.calc_mode,
     ),
     GardenHydroSensorDescription(
         key="tmin_c",
@@ -106,6 +122,63 @@ SENSOR_DESCRIPTIONS: tuple[GardenHydroSensorDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda result: result.ra_used_mj_m2_day,
         round_digits=1,
+    ),
+    GardenHydroSensorDescription(
+        key="rh_mean_pct",
+        translation_key="rh_mean_pct",
+        native_unit_of_measurement="%",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda result: result.humidity_pct,
+        round_digits=1,
+    ),
+    GardenHydroSensorDescription(
+        key="wind_speed_m_s",
+        translation_key="wind_speed_m_s",
+        native_unit_of_measurement="m/s",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda result: result.wind_speed_m_s,
+        round_digits=1,
+    ),
+    GardenHydroSensorDescription(
+        key="solar_radiation_mj_m2_day",
+        translation_key="solar_radiation_mj_m2_day",
+        native_unit_of_measurement="MJ/m²/day",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda result: result.solar_radiation_mj_m2_day,
+        round_digits=1,
+    ),
+    GardenHydroSensorDescription(
+        key="latitude",
+        translation_key="latitude",
+        native_unit_of_measurement="°",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda result: result.latitude,
+        round_digits=4,
+    ),
+    GardenHydroSensorDescription(
+        key="elevation_m",
+        translation_key="elevation_m",
+        native_unit_of_measurement="m",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda result: result.elevation_m,
+        round_digits=1,
+    ),
+    GardenHydroSensorDescription(
+        key="hargreaves_status",
+        translation_key="hargreaves_status",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda result: result.hargreaves_status,
+    ),
+    GardenHydroSensorDescription(
+        key="penman_monteith_status",
+        translation_key="penman_monteith_status",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda result: result.penman_monteith_status,
     ),
     GardenHydroSensorDescription(
         key="weather_status",
@@ -197,13 +270,26 @@ class GardenHydroSensor(CoordinatorEntity[GardenHydroCoordinator], RestoreSensor
         return {
             key: value
             for key, value in {
+                "alias_for": "eto_hargreaves_mm",
+                "eto_hargreaves_mm": result.eto_hargreaves_mm,
+                "eto_penman_monteith_mm": result.eto_penman_monteith_mm,
                 "tmin_c": result.tmin_c,
                 "tmax_c": result.tmax_c,
                 "tmean_c": result.tmean_c,
                 "temperature_delta_c": result.temperature_delta_c,
+                "humidity_pct": result.humidity_pct,
+                "wind_speed_m_s": result.wind_speed_m_s,
+                "solar_radiation_mj_m2_day": result.solar_radiation_mj_m2_day,
+                "latitude": result.latitude,
+                "elevation_m": result.elevation_m,
                 "ra_mj_m2_day": result.ra_used_mj_m2_day,
+                "hargreaves_status": result.hargreaves_status,
+                "penman_monteith_status": result.penman_monteith_status,
+                "weather_status": result.weather_status,
                 "source_tmin_entity_id": result.source_tmin_entity_id,
                 "source_tmax_entity_id": result.source_tmax_entity_id,
+                "source_rain_entity_id": result.source_rain_entity_id,
+                "source_forecast_rain_entity_id": result.source_forecast_rain_entity_id,
                 "calculation_date": result.calculation_date,
                 "calc_mode": result.calc_mode,
             }.items()

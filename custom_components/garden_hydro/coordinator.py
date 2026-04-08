@@ -13,27 +13,49 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    ACCEPTED_HUMIDITY_UNITS,
     ACCEPTED_RAIN_UNITS,
+    ACCEPTED_SOLAR_RADIATION_UNITS,
     ACCEPTED_TEMP_UNITS,
-    CALC_MODE,
+    ACCEPTED_WIND_SPEED_UNITS,
+    CALC_MODE_HARGREAVES,
+    CALC_MODE_PENMAN_MONTEITH,
+    CONF_ELEVATION,
+    CONF_ENABLE_HARGREAVES,
+    CONF_ENABLE_PENMAN_MONTEITH,
     CONF_FORECAST_RAIN_ENTITY_ID,
+    CONF_HUMIDITY_ENTITY_ID,
+    CONF_LATITUDE,
     CONF_RAIN_ENTITY_ID,
     CONF_ROLLUP_TIME,
+    CONF_SOLAR_RADIATION_ENTITY_ID,
     CONF_TMAX_ENTITY_ID,
     CONF_TMIN_ENTITY_ID,
+    CONF_WIND_SPEED_ENTITY_ID,
     DEFAULT_ROLLUP_TIME,
     MAX_FORECAST_RAIN_MM,
+    MAX_HUMIDITY_PCT,
     MAX_RAIN_MM,
+    MAX_SOLAR_RADIATION_MJ_M2_DAY,
     MAX_TEMP_C,
+    MAX_WIND_SPEED_M_S,
     MIN_TEMP_C,
     WEATHER_INVALID_NUMERIC_INPUT,
     WEATHER_INVALID_TEMPERATURE_RANGE,
+    WEATHER_MISSING_HUMIDITY,
     WEATHER_MISSING_RAIN,
+    WEATHER_MISSING_SOLAR_RADIATION,
     WEATHER_MISSING_TMAX,
     WEATHER_MISSING_TMIN,
+    WEATHER_MISSING_WIND_SPEED,
     WEATHER_OK,
+    WEATHER_PARTIAL,
 )
-from .eto import blended_ra_for_date, calculate_hargreaves_eto
+from .eto import (
+    blended_ra_for_date,
+    calculate_hargreaves_eto,
+    calculate_penman_monteith_eto,
+)
 from .models import RuntimeData, SiteCalculationResult
 
 _LOGGER = logging.getLogger(__name__)
@@ -148,7 +170,7 @@ class GardenHydroCoordinator(DataUpdateCoordinator[SiteCalculationResult]):
         self.async_set_updated_data(result)
         return result
 
-    def _calculate(
+    def _calculate(  # noqa: PLR0912
         self,
         *,
         now: datetime,
@@ -215,25 +237,114 @@ class GardenHydroCoordinator(DataUpdateCoordinator[SiteCalculationResult]):
             )
 
         calculation_date = now.date()
-        ra_used = blended_ra_for_date(calculation_date, self.runtime.ra_values)
-        eto_mm = calculate_hargreaves_eto(tmin, tmax, ra_used)
+        ra_used = blended_ra_for_date(now.date(), self.runtime.ra_values)
+        enabled_modes: list[str] = []
+        if self.config.get(CONF_ENABLE_HARGREAVES, True):
+            enabled_modes.append(CALC_MODE_HARGREAVES)
+        if self.config.get(CONF_ENABLE_PENMAN_MONTEITH, True):
+            enabled_modes.append(CALC_MODE_PENMAN_MONTEITH)
+
+        eto_hargreaves_mm: float | None = None
+        eto_penman_monteith_mm: float | None = None
+        hargreaves_status: str = "disabled"
+        penman_status: str = "disabled"
+        humidity: float | None = None
+        wind_speed: float | None = None
+        solar_radiation: float | None = None
+
+        if self.config.get(CONF_ENABLE_HARGREAVES, True):
+            eto_hargreaves_mm = calculate_hargreaves_eto(
+                tmin_c=tmin,
+                tmax_c=tmax,
+                ra_mj_m2_day=ra_used,
+            )
+            hargreaves_status = WEATHER_OK
+
+        if self.config.get(CONF_ENABLE_PENMAN_MONTEITH, True):
+            humidity_result = self._read_required_numeric(
+                self.config[CONF_HUMIDITY_ENTITY_ID],
+                accepted_units=ACCEPTED_HUMIDITY_UNITS,
+                missing_status=WEATHER_MISSING_HUMIDITY,
+                min_value=0.0,
+                max_value=MAX_HUMIDITY_PCT,
+            )
+            wind_result = self._read_required_numeric(
+                self.config[CONF_WIND_SPEED_ENTITY_ID],
+                accepted_units=ACCEPTED_WIND_SPEED_UNITS,
+                missing_status=WEATHER_MISSING_WIND_SPEED,
+                min_value=0.0,
+                max_value=MAX_WIND_SPEED_M_S,
+            )
+            solar_result = self._read_required_numeric(
+                self.config[CONF_SOLAR_RADIATION_ENTITY_ID],
+                accepted_units=ACCEPTED_SOLAR_RADIATION_UNITS,
+                missing_status=WEATHER_MISSING_SOLAR_RADIATION,
+                min_value=0.0,
+                max_value=MAX_SOLAR_RADIATION_MJ_M2_DAY,
+            )
+
+            if (
+                not isinstance(humidity_result, str)
+                and not isinstance(wind_result, str)
+                and not isinstance(solar_result, str)
+            ):
+                humidity = humidity_result
+                wind_speed = wind_result
+                solar_radiation = solar_result
+                eto_penman_monteith_mm = calculate_penman_monteith_eto(
+                    tmin_c=tmin,
+                    tmax_c=tmax,
+                    humidity_pct=humidity,
+                    wind_speed_m_s=wind_speed,
+                    solar_radiation_mj_m2_day=solar_radiation,
+                    elevation_m=float(self.config[CONF_ELEVATION]),
+                    latitude_deg=float(self.config[CONF_LATITUDE]),
+                    day=now.date(),
+                )
+                penman_status = WEATHER_OK
+            else:
+                penman_status = (
+                    WEATHER_INVALID_NUMERIC_INPUT
+                    if any(
+                        value == WEATHER_INVALID_NUMERIC_INPUT
+                        for value in (humidity_result, wind_result, solar_result)
+                        if isinstance(value, str)
+                    )
+                    else WEATHER_PARTIAL
+                )
+
+        weather_status = WEATHER_OK
+        if WEATHER_OK not in (hargreaves_status, penman_status):
+            weather_status = WEATHER_INVALID_NUMERIC_INPUT
+        elif hargreaves_status != WEATHER_OK or penman_status != WEATHER_OK:
+            weather_status = WEATHER_PARTIAL
+
         tmean = (tmin + tmax) / 2.0
         temperature_delta = tmax - tmin
 
         last_rollup = now if is_scheduled else self.runtime.result.last_rollup
         return SiteCalculationResult(
-            daily_eto_mm=eto_mm,
+            eto_hargreaves_mm=(round(eto_hargreaves_mm, 2) if eto_hargreaves_mm is not None else None),
+            eto_penman_monteith_mm=(round(eto_penman_monteith_mm, 2) if eto_penman_monteith_mm is not None else None),
+            daily_eto_mm=(round(eto_hargreaves_mm, 2) if eto_hargreaves_mm is not None else None),
             daily_rain_mm=rain,
             forecast_rain_mm=forecast_rain,
             last_rollup=last_rollup,
             last_calculation=now,
-            calc_mode=CALC_MODE,
+            calc_mode=",".join(enabled_modes),
             tmin_c=tmin,
             tmax_c=tmax,
+            humidity_pct=round(humidity, 1) if humidity is not None else None,
+            wind_speed_m_s=round(wind_speed, 2) if wind_speed is not None else None,
+            solar_radiation_mj_m2_day=(round(solar_radiation, 2) if solar_radiation is not None else None),
+            latitude=float(self.config[CONF_LATITUDE]),
+            elevation_m=float(self.config[CONF_ELEVATION]),
             ra_used_mj_m2_day=ra_used,
-            weather_status=WEATHER_OK,
+            weather_status=weather_status,
             calculation_date=calculation_date.isoformat(),
             is_scheduled=is_scheduled,
+            hargreaves_status=hargreaves_status,
+            penman_monteith_status=penman_status,
             source_tmin_entity_id=self.config[CONF_TMIN_ENTITY_ID],
             source_tmax_entity_id=self.config[CONF_TMAX_ENTITY_ID],
             source_rain_entity_id=self.config[CONF_RAIN_ENTITY_ID],
@@ -251,12 +362,17 @@ class GardenHydroCoordinator(DataUpdateCoordinator[SiteCalculationResult]):
     ) -> SiteCalculationResult:
         """Return the previous result with updated failure metadata."""
         previous_result = self.runtime.result
+        enabled_modes: list[str] = []
+        if self.config.get(CONF_ENABLE_HARGREAVES, True):
+            enabled_modes.append(CALC_MODE_HARGREAVES)
+        if self.config.get(CONF_ENABLE_PENMAN_MONTEITH, True):
+            enabled_modes.append(CALC_MODE_PENMAN_MONTEITH)
         return replace(
             previous_result,
             last_calculation=now,
             weather_status=weather_status,
             is_scheduled=is_scheduled,
-            calc_mode=CALC_MODE,
+            calc_mode=",".join(enabled_modes),
         )
 
     def _read_required_numeric(
