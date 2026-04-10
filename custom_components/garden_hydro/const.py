@@ -104,15 +104,17 @@ ACCEPTED_HUMIDITY_UNITS: Final[set[str | None]] = {
     None,
     "%",
 }
-ACCEPTED_WIND_SPEED_UNITS: Final[set[str | None]] = {
-    None,
-    "m/s",
-    "mps",
-}
+ACCEPTED_WIND_SPEED_UNITS: Final[set[str | None]] = {None, "m/s", "mps", "km/h", "mph", "knots", "kt", "kn"}
 ACCEPTED_SOLAR_RADIATION_UNITS: Final[set[str | None]] = {
     None,
     "MJ/m²/day",
     "MJ/m2/day",
+    "W/m²",
+    "W/m2",
+    "kWh/m²",
+    "kWh/m2",
+    "Wh/m²",
+    "Wh/m2",
 }
 
 MIN_TEMP_C: Final = -40.0

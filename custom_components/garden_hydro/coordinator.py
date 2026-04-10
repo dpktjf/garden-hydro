@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from dataclasses import replace
 from datetime import datetime, time, timedelta
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.helpers.event import async_track_point_in_time
@@ -57,6 +57,9 @@ from .eto import (
     calculate_penman_monteith_eto,
 )
 from .models import RuntimeData, SiteCalculationResult
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -274,6 +277,7 @@ class GardenHydroCoordinator(DataUpdateCoordinator[SiteCalculationResult]):
                 missing_status=WEATHER_MISSING_WIND_SPEED,
                 min_value=0.0,
                 max_value=MAX_WIND_SPEED_M_S,
+                converter=_normalize_wind_speed,
             )
             solar_result = self._read_required_numeric(
                 self.config[CONF_SOLAR_RADIATION_ENTITY_ID],
@@ -281,6 +285,7 @@ class GardenHydroCoordinator(DataUpdateCoordinator[SiteCalculationResult]):
                 missing_status=WEATHER_MISSING_SOLAR_RADIATION,
                 min_value=0.0,
                 max_value=MAX_SOLAR_RADIATION_MJ_M2_DAY,
+                converter=_normalize_solar_radiation,
             )
 
             if (
@@ -375,7 +380,7 @@ class GardenHydroCoordinator(DataUpdateCoordinator[SiteCalculationResult]):
             calc_mode=",".join(enabled_modes),
         )
 
-    def _read_required_numeric(
+    def _read_required_numeric(  # noqa: PLR0913
         self,
         entity_id: str,
         *,
@@ -383,9 +388,16 @@ class GardenHydroCoordinator(DataUpdateCoordinator[SiteCalculationResult]):
         missing_status: str,
         min_value: float,
         max_value: float,
+        converter: Callable[[float | None, str | None], float | None] | None = None,
     ) -> float | str:
         """Read and validate a required numeric entity value."""
         state = self.hass.states.get(entity_id)
+        self.logger.debug(
+            "Reading entity '%s': state=%s, attributes=%s",
+            entity_id,
+            state.state if state else None,
+            state.attributes if state else None,
+        )
         if state is None or state.state in _MISSING_STATES:
             return missing_status
 
@@ -397,6 +409,11 @@ class GardenHydroCoordinator(DataUpdateCoordinator[SiteCalculationResult]):
             value = float(state.state)
         except (TypeError, ValueError):
             return WEATHER_INVALID_NUMERIC_INPUT
+
+        if converter is not None:
+            value = converter(value, unit)
+            if value is None:
+                return WEATHER_INVALID_NUMERIC_INPUT
 
         if value < min_value or value > max_value:
             return WEATHER_INVALID_NUMERIC_INPUT
@@ -410,6 +427,7 @@ class GardenHydroCoordinator(DataUpdateCoordinator[SiteCalculationResult]):
         accepted_units: set[str | None],
         min_value: float,
         max_value: float,
+        converter: Callable[[float | None, str | None], float | None] | None = None,
     ) -> float | None:
         """Read and validate an optional numeric entity value."""
         state = self.hass.states.get(entity_id)
@@ -425,7 +443,98 @@ class GardenHydroCoordinator(DataUpdateCoordinator[SiteCalculationResult]):
         except (TypeError, ValueError):
             return None
 
+        if converter is not None:
+            value = converter(value, unit)
+            if value is None:
+                return None
+
         if value < min_value or value > max_value:
             return None
 
         return value
+
+
+def _normalize_wind_speed(
+    value: float | None,
+    unit: str | None,
+) -> float | None:
+    """
+    Convert wind speed to meters per second.
+
+    Supported input units:
+        - m/s
+        - km/h
+        - mph
+        - kt (knots)
+        - kn
+
+    Returns:
+        Wind speed in m/s, or None if value is invalid.
+
+    """
+    if value is None:
+        return None
+
+    if unit in (None, "m/s"):
+        return value
+
+    if unit == "km/h":
+        return value / 3.6
+
+    if unit == "mph":
+        return value * 0.44704
+
+    if unit in ("kt", "kn", "knots"):
+        return value * 0.514444
+
+    _LOGGER.warning(
+        "Unsupported wind speed unit '%s'",
+        unit,
+    )
+
+    return None
+
+
+def _normalize_solar_radiation(
+    value: float | None,
+    unit: str | None,
+) -> float | None:
+    """
+    Convert solar radiation to MJ/m²/day.
+
+    Supported input units:
+        - MJ/m²/day
+        - MJ/m2/day
+        - W/m²
+        - W/m2
+        - Wh/m²
+        - Wh/m2
+        - kWh/m²
+        - kWh/m2
+
+    Notes:
+        W/m² is treated as a daily-average irradiance and converted using:
+        MJ/m²/day = W/m² * 0.0864
+
+    """
+    if value is None:
+        return None
+
+    if unit in (None, "MJ/m²/day", "MJ/m2/day"):
+        return value
+
+    if unit in ("W/m²", "W/m2"):
+        return value * 0.0864
+
+    if unit in ("Wh/m²", "Wh/m2"):
+        return value / 277.7778
+
+    if unit in ("kWh/m²", "kWh/m2"):
+        return value * 3.6
+
+    _LOGGER.warning(
+        "Unsupported solar radiation unit '%s'",
+        unit,
+    )
+
+    return None

@@ -40,6 +40,7 @@ class GardenHydroConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         """Initialize the config flow."""
         self._data: dict[str, Any] = {}
+        self._reconfigure_entry: config_entries.ConfigEntry | None = None
 
     async def async_step_user(
         self,
@@ -90,6 +91,56 @@ class GardenHydroConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
+    async def async_step_reconfigure(
+        self,
+        user_input: dict[str, Any] | None = None,
+    ) -> config_entries.ConfigFlowResult:
+        """Handle reconfiguration of an existing config entry."""
+        _LOGGER.debug("Entered async_step_reconfigure with input: %s", user_input)
+
+        self._reconfigure_entry = self._get_reconfigure_entry()
+        current_data = dict(self._reconfigure_entry.data)
+
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            site_name = str(user_input[CONF_SITE_NAME]).strip()
+            if not site_name:
+                errors[CONF_SITE_NAME] = "site_name_required"
+            elif not user_input[CONF_ENABLE_HARGREAVES] and not user_input[CONF_ENABLE_PENMAN_MONTEITH]:
+                errors["base"] = "at_least_one_engine_required"
+            else:
+                self._data = current_data
+                self._data.update(user_input)
+                self._data[CONF_SITE_NAME] = site_name
+                self._data[CONF_LATITUDE] = self.hass.config.latitude
+                self._data[CONF_ELEVATION] = self.hass.config.elevation
+                return await self.async_step_reconfigure_weather_mapping()
+
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_SITE_NAME,
+                        default=current_data.get(CONF_SITE_NAME, DEFAULT_SITE_NAME),
+                    ): selector.TextSelector(),
+                    vol.Required(
+                        CONF_ROLLUP_TIME,
+                        default=current_data.get(CONF_ROLLUP_TIME, DEFAULT_ROLLUP_TIME),
+                    ): selector.TimeSelector(),
+                    vol.Required(
+                        CONF_ENABLE_HARGREAVES,
+                        default=current_data.get(CONF_ENABLE_HARGREAVES, True),
+                    ): selector.BooleanSelector(),
+                    vol.Required(
+                        CONF_ENABLE_PENMAN_MONTEITH,
+                        default=current_data.get(CONF_ENABLE_PENMAN_MONTEITH, True),
+                    ): selector.BooleanSelector(),
+                }
+            ),
+            errors=errors,
+        )
+
     async def async_step_weather_mapping(
         self,
         user_input: dict[str, Any] | None = None,
@@ -118,18 +169,77 @@ class GardenHydroConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Required(CONF_RAIN_ENTITY_ID): selector.EntitySelector(
                         selector.EntitySelectorConfig(domain="sensor")
                     ),
-                    vol.Optional(CONF_FORECAST_RAIN_ENTITY_ID): selector.EntitySelector(
+                    vol.Required(CONF_FORECAST_RAIN_ENTITY_ID): selector.EntitySelector(
                         selector.EntitySelectorConfig(domain="sensor")
                     ),
-                    vol.Optional(CONF_HUMIDITY_ENTITY_ID): selector.EntitySelector(
+                    vol.Required(CONF_HUMIDITY_ENTITY_ID): selector.EntitySelector(
                         selector.EntitySelectorConfig(domain="sensor")
                     ),
-                    vol.Optional(CONF_WIND_SPEED_ENTITY_ID): selector.EntitySelector(
+                    vol.Required(CONF_WIND_SPEED_ENTITY_ID): selector.EntitySelector(
                         selector.EntitySelectorConfig(domain="sensor")
                     ),
-                    vol.Optional(CONF_SOLAR_RADIATION_ENTITY_ID): selector.EntitySelector(
+                    vol.Required(CONF_SOLAR_RADIATION_ENTITY_ID): selector.EntitySelector(
                         selector.EntitySelectorConfig(domain="sensor")
                     ),
+                }
+            ),
+            errors=errors,
+        )
+
+    async def async_step_reconfigure_weather_mapping(
+        self,
+        user_input: dict[str, Any] | None = None,
+    ) -> config_entries.ConfigFlowResult:
+        """Handle weather mapping updates for an existing entry."""
+        assert self._reconfigure_entry is not None  # noqa: S101
+
+        current_data = dict(self._reconfigure_entry.data)
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            errors = self._validate_weather_mapping(user_input)
+            if not errors:
+                self._data.update(user_input)
+                self.hass.config_entries.async_update_entry(
+                    self._reconfigure_entry,
+                    data=self._data,
+                    title=self._data[CONF_SITE_NAME],
+                )
+                await self.hass.config_entries.async_reload(self._reconfigure_entry.entry_id)
+                return self.async_abort(reason="reconfigure_successful")
+
+        return self.async_show_form(
+            step_id="reconfigure_weather_mapping",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_TMIN_ENTITY_ID,
+                        default=current_data.get(CONF_TMIN_ENTITY_ID),
+                    ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
+                    vol.Required(
+                        CONF_TMAX_ENTITY_ID,
+                        default=current_data.get(CONF_TMAX_ENTITY_ID),
+                    ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
+                    vol.Required(
+                        CONF_RAIN_ENTITY_ID,
+                        default=current_data.get(CONF_RAIN_ENTITY_ID),
+                    ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
+                    vol.Required(
+                        CONF_FORECAST_RAIN_ENTITY_ID,
+                        default=current_data.get(CONF_FORECAST_RAIN_ENTITY_ID),
+                    ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
+                    vol.Required(
+                        CONF_HUMIDITY_ENTITY_ID,
+                        default=current_data.get(CONF_HUMIDITY_ENTITY_ID),
+                    ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
+                    vol.Required(
+                        CONF_WIND_SPEED_ENTITY_ID,
+                        default=current_data.get(CONF_WIND_SPEED_ENTITY_ID),
+                    ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
+                    vol.Required(
+                        CONF_SOLAR_RADIATION_ENTITY_ID,
+                        default=current_data.get(CONF_SOLAR_RADIATION_ENTITY_ID),
+                    ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
                 }
             ),
             errors=errors,

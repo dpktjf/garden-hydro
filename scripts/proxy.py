@@ -1,6 +1,7 @@
 # ruff: noqa no lint...
 
 import random
+from shutil import copy
 import stat
 import time
 from flask import Flask, Response, jsonify, request
@@ -32,6 +33,47 @@ MARKET_RESPONSES = {
         "session": "holiday",
         "timezone": "America/New_York",
     },
+}
+BASE_GHI = 5077.212
+VARIATION_PCT = 0.005  # ±.5%
+
+
+def randomized_ghi(base: float, pct: float) -> float:
+    """
+    Return a value randomly varied around base by ±pct.
+    Example: base=5077, pct=0.05 → range ≈ 4823–5331
+    """
+    delta = base * pct
+    value = random.uniform(base - delta, base + delta)
+    return round(value, 3)
+
+
+SOLAR_RESPONSE = {
+    "lat": 51.4395,
+    "lon": 0.0998,
+    "date": "2023-04-08",
+    "interval": "1d",
+    "tz": "+01:00",
+    "sunrise": "2023-04-08T06:19:47",
+    "sunset": "2023-04-08T19:44:18",
+    "intervals": [
+        {
+            "start": "00:00",
+            "end": "23:59",
+            "avg_irradiance": {
+                "clear_sky": {"ghi": 238.342, "dni": 378.646, "dhi": 46.256},
+                "cloudy_sky": {"ghi": 211.551, "dni": 274.013, "dhi": 76.882},
+            },
+            "max_irradiance": {
+                "clear_sky": {"ghi": 732.078, "dni": 875.758, "dhi": 111.881},
+                "cloudy_sky": {"ghi": 687.804, "dni": 784.251, "dhi": 341.816},
+            },
+            "irradiation": {
+                "clear_sky": {"ghi": 5720.2, "dni": 9087.497, "dhi": 1110.14},
+                "cloudy_sky": {"ghi": BASE_GHI, "dni": 6576.317, "dhi": 1845.173},
+            },
+        }
+    ],
 }
 
 
@@ -98,6 +140,33 @@ def status():
         return jsonify({"error": "Invalid API key."}), 401
     response = MARKET_RESPONSES.get(state["market"], MARKET_RESPONSES["open"])
     return jsonify({**response, "t": int(time.time())})
+
+
+@app.get("/energy")
+def energy():
+    """
+    Returns static dummy irradiance data.
+
+    Query parameters are accepted but ignored,
+    allowing drop-in replacement for the real API.
+    """
+    # Optional: echo query params if useful for debugging
+    lat = request.args.get("lat")
+    lon = request.args.get("lon")
+    date = request.args.get("date")
+
+    response = SOLAR_RESPONSE.copy()
+
+    # Randomize only this field
+    response["intervals"][0]["irradiation"]["cloudy_sky"]["ghi"] = randomized_ghi(BASE_GHI, VARIATION_PCT)
+    if lat:
+        response["lat"] = float(lat)
+    if lon:
+        response["lon"] = float(lon)
+    if date:
+        response["date"] = date
+
+    return jsonify(response)
 
 
 if __name__ == "__main__":

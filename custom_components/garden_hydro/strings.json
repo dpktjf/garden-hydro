@@ -12,9 +12,32 @@
           "enable_penman_monteith": "Enable Penman-Monteith"
         }
       },
+      "reconfigure": {
+        "title": "Reconfigure DPK Garden Hydro",
+        "description": "Update the site-level ETo engine settings.",
+        "data": {
+          "site_name": "Site name",
+          "rollup_time": "Daily rollup time",
+          "enable_hargreaves": "Enable Hargreaves",
+          "enable_penman_monteith": "Enable Penman-Monteith"
+        }
+      },
       "weather_mapping": {
         "title": "Weather source entities",
         "description": "Map the site weather sensors used for the ETo calculations.",
+        "data": {
+          "tmin_entity_id": "Daily minimum temperature entity",
+          "tmax_entity_id": "Daily maximum temperature entity",
+          "rain_entity_id": "Daily rainfall entity",
+          "forecast_rain_entity_id": "Forecast rainfall entity",
+          "humidity_entity_id": "Mean relative humidity entity",
+          "wind_speed_entity_id": "Wind speed entity",
+          "solar_radiation_entity_id": "Solar radiation entity"
+        }
+      },
+      "reconfigure_weather_mapping": {
+        "title": "Weather source entities",
+        "description": "Update the site weather sensors used for the ETo calculations.",
         "data": {
           "tmin_entity_id": "Daily minimum temperature entity",
           "tmax_entity_id": "Daily maximum temperature entity",
@@ -36,7 +59,8 @@
       "elevation_required": "Elevation is required"
     },
     "abort": {
-      "single_instance_allowed": "Only one DPK Garden Hydro site is supported right now."
+      "single_instance_allowed": "Only one DPK Garden Hydro site is supported right now.",
+      "reconfigure_successful": "Garden Hydro was updated successfully."
     }
   },
   "entity": {

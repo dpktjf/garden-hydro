@@ -11,24 +11,44 @@ logger:
   logs:
     custom_components.garden_hydro: debug
     # homeassistant.config_entries: debug
-    homeassistant.helpers.selector: debug
-    homeassistant.components.websocket_api.http.connection: debug
+    #homeassistant.helpers.selector: debug
+    #homeassistant.components.websocket_api.http.connection: debug
+
+rest:
+      #https://api.openweathermap.org/energy/2.0/solar/interval_data
+  - resource_template: >-
+      http://127.0.0.1:5000/energy?lat={{ state_attr('zone.home', 'latitude') }}
+      &lon={{ state_attr('zone.home', 'longitude') }}
+      &date={{ now().strftime('%Y-%m-%d') }}
+      &interval=1d
+      &tz={{ now().strftime('%z')[:3] ~ ':' ~ now().strftime('%z')[3:] }}
+      &appid=YOUR_OPENWEATHER_API_KEY
+    scan_interval: 60
+    # scan_interval: 21600
+    timeout: 30
+    sensor:
+      - name: OpenWeather Solar Irradiance Raw
+        unique_id: openweather_solar_irradiance_raw
+        value_template: "{{ value_json.date }}"
+        json_attributes_path: "$.intervals[0]"
+        json_attributes:
+          - irradiation
+          - avg_irradiance
+          - max_irradiance
 
 template:
-
   - sensor:
-
       - name: "Test Garden Tmin"
         unique_id: test_garden_tmin
         unit_of_measurement: "°C"
         state_class: measurement
-        state: 2.89
+        state: 6.44
 
       - name: "Test Garden Tmax"
         unique_id: test_garden_tmax
         unit_of_measurement: "°C"
         state_class: measurement
-        state: 10.56
+        state: 22.07
 
       - name: "Test Garden Rain"
         unique_id: test_garden_rain
@@ -41,3 +61,46 @@ template:
         unit_of_measurement: "mm"
         state_class: measurement
         state: 3
+      - name: "Test Garden Humidity"
+        unique_id: test_garden_humidity
+        unit_of_measurement: "%"
+        state_class: measurement
+        state: 66
+      - name: "Test Garden Wind Speed Avg 24h"
+        unique_id: test_wind_speed_avg_24h
+        unit_of_measurement: km/h
+        state_class: measurement
+        state: 5.9
+
+      - name: OpenWeather Solar Radiation MJ m2 Day
+        unique_id: openweather_solar_radiation_mj_m2_day
+        unit_of_measurement: "MJ/m²/day"
+        state_class: measurement
+        availability: >
+          {{
+            state_attr('sensor.openweather_solar_irradiance_raw', 'irradiation') is mapping
+            and state_attr('sensor.openweather_solar_irradiance_raw', 'irradiation').get('cloudy_sky') is mapping
+            and state_attr('sensor.openweather_solar_irradiance_raw', 'irradiation').get('cloudy_sky').get('ghi') is not none
+          }}
+        state: >
+          {% set irr = state_attr('sensor.openweather_solar_irradiance_raw', 'irradiation') %}
+          {% set ghi_wh = irr['cloudy_sky']['ghi'] | float(0) %}
+          {{ (ghi_wh / 277.7778) | round(2) }}
+
+      - name: OpenWeather Solar Radiation Source
+        unique_id: openweather_solar_radiation_source
+        state: "OpenWeather Solar Irradiance API"
+
+      - name: OpenWeather Solar GHI Avg W m2
+        unique_id: openweather_solar_ghi_avg_w_m2
+        unit_of_measurement: "W/m²"
+        state_class: measurement
+        availability: >
+          {{
+            state_attr('sensor.openweather_solar_irradiance_raw', 'avg_irradiance') is mapping
+            and state_attr('sensor.openweather_solar_irradiance_raw', 'avg_irradiance').get('cloudy_sky') is mapping
+            and state_attr('sensor.openweather_solar_irradiance_raw', 'avg_irradiance').get('cloudy_sky').get('ghi') is not none
+          }}
+        state: >
+          {% set avg = state_attr('sensor.openweather_solar_irradiance_raw', 'avg_irradiance') %}
+          {{ avg['cloudy_sky']['ghi'] | float(0) | round(1) }}
