@@ -67,6 +67,9 @@
     "zone": {
       "entry_type": "Watering zone",
       "title": "Watering zone",
+      "initiate_flow": {
+        "title": "Add watering zone"
+      },
       "step": {
         "user": {
           "title": "Add watering zone",
