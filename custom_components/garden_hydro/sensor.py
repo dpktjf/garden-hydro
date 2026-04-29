@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
     from custom_components.garden_hydro import GardenHydroEntryData
 
-    from .models import SiteCalculationResult
+    from .models import SiteCalculationResult, ZoneCalculationResult
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -35,6 +35,15 @@ class GardenHydroSensorDescription(SensorEntityDescription):
     """Describe a coordinator-backed Garden Hydro sensor."""
 
     value_fn: Callable[[SiteCalculationResult], Any]
+    round_digits: int | None = None
+
+
+@dataclass(frozen=True, kw_only=True)
+class GardenHydroZoneSensorDescription(SensorEntityDescription):
+    """Describe a coordinator-backed Garden Hydro zone sensor."""
+
+    value_fn: Callable[[ZoneCalculationResult], Any]
+    fallback_name: str
     round_digits: int | None = None
 
 
@@ -189,6 +198,70 @@ SENSOR_DESCRIPTIONS: tuple[GardenHydroSensorDescription, ...] = (
 )
 
 
+ZONE_SENSOR_DESCRIPTIONS: tuple[GardenHydroZoneSensorDescription, ...] = (
+    GardenHydroZoneSensorDescription(
+        key="selected_eto_mm",
+        translation_key="zone_selected_eto_mm",
+        fallback_name="Selected ETo",
+        native_unit_of_measurement=UNIT_MILLIMETERS,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda result: result.selected_eto_mm,
+        round_digits=2,
+    ),
+    GardenHydroZoneSensorDescription(
+        key="zone_eto_mm",
+        translation_key="zone_eto_mm",
+        fallback_name="Zone ETo",
+        native_unit_of_measurement=UNIT_MILLIMETERS,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda result: result.zone_eto_mm,
+        round_digits=2,
+    ),
+    GardenHydroZoneSensorDescription(
+        key="effective_rain_mm",
+        translation_key="zone_effective_rain_mm",
+        fallback_name="Effective rain",
+        native_unit_of_measurement=UNIT_MILLIMETERS,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda result: result.effective_rain_mm,
+        round_digits=2,
+    ),
+    GardenHydroZoneSensorDescription(
+        key="forecast_credit_mm",
+        translation_key="zone_forecast_credit_mm",
+        fallback_name="Forecast credit",
+        native_unit_of_measurement=UNIT_MILLIMETERS,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda result: result.forecast_credit_mm,
+        round_digits=2,
+    ),
+    GardenHydroZoneSensorDescription(
+        key="water_required_mm",
+        translation_key="zone_water_required_mm",
+        fallback_name="Water required",
+        native_unit_of_measurement=UNIT_MILLIMETERS,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda result: result.water_required_mm,
+        round_digits=2,
+    ),
+    GardenHydroZoneSensorDescription(
+        key="recommended_runtime_min",
+        translation_key="zone_recommended_runtime_min",
+        fallback_name="Recommended runtime",
+        native_unit_of_measurement="min",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda result: result.recommended_runtime_min,
+        round_digits=1,
+    ),
+    GardenHydroZoneSensorDescription(
+        key="status",
+        translation_key="zone_status",
+        fallback_name="Status",
+        value_fn=lambda result: result.status,
+    ),
+)
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -197,7 +270,15 @@ async def async_setup_entry(
     """Set up Garden Hydro sensor entities for a config entry."""
     entry_data: GardenHydroEntryData = hass.data[DOMAIN][entry.entry_id]
     coordinator: GardenHydroCoordinator = entry_data.coordinator
-    async_add_entities(GardenHydroSensor(coordinator, entry, description) for description in SENSOR_DESCRIPTIONS)
+    entities: list[GardenHydroSensor | GardenHydroZoneSensor] = [
+        GardenHydroSensor(coordinator, entry, description) for description in SENSOR_DESCRIPTIONS
+    ]
+    for zone_slug, settings in entry_data.runtime.zone_settings.items():
+        entities.extend(
+            GardenHydroZoneSensor(coordinator, entry, zone_slug, settings.zone_name, description)
+            for description in ZONE_SENSOR_DESCRIPTIONS
+        )
+    async_add_entities(entities)
 
 
 class GardenHydroSensor(CoordinatorEntity[GardenHydroCoordinator], RestoreSensor):
@@ -295,3 +376,66 @@ class GardenHydroSensor(CoordinatorEntity[GardenHydroCoordinator], RestoreSensor
             }.items()
             if value is not None
         }
+
+
+class GardenHydroZoneSensor(CoordinatorEntity[GardenHydroCoordinator], RestoreSensor):
+    """Coordinator-backed advisory sensor for one watering zone."""
+
+    _attr_has_entity_name = True
+    entity_description: GardenHydroZoneSensorDescription
+
+    def __init__(
+        self,
+        coordinator: GardenHydroCoordinator,
+        entry: ConfigEntry,
+        zone_slug: str,
+        zone_name: str,
+        description: GardenHydroZoneSensorDescription,
+    ) -> None:
+        """Initialize the zone sensor."""
+        super().__init__(coordinator)
+        self.entity_description = description
+        self._zone_slug = zone_slug
+        self._attr_unique_id = f"{entry.entry_id}:zone:{zone_slug}:{description.key}"
+        self._attr_translation_key = description.translation_key
+        self._attr_name = description.fallback_name
+        self._attr_suggested_display_precision = description.round_digits
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"{entry.entry_id}:{zone_slug}")},
+            name=zone_name,
+            manufacturer="DPK",
+            model="Garden Hydro Zone",
+            via_device=(DOMAIN, entry.entry_id),
+        )
+        self._restored_native_value: Any = None
+        self._restored_unit: str | None = None
+
+    async def async_added_to_hass(self) -> None:
+        """Restore the previous state after Home Assistant starts."""
+        await super().async_added_to_hass()
+        last_data = await self.async_get_last_sensor_data()
+        if last_data is None:
+            return
+        self._restored_native_value = last_data.native_value
+        self._restored_unit = last_data.native_unit_of_measurement
+
+    @property
+    def native_value(self) -> Any:
+        """Return the current zone sensor value."""
+        result = self.coordinator.data.zone_results.get(self._zone_slug)
+        if result is None:
+            return self._restored_native_value
+
+        value = self.entity_description.value_fn(result)
+        if value is None:
+            return self._restored_native_value
+        if isinstance(value, float) and self.entity_description.round_digits is not None:
+            return round(value, self.entity_description.round_digits)
+        return value
+
+    @property
+    def native_unit_of_measurement(self) -> str | None:
+        """Return the native unit, falling back to restored state if needed."""
+        if self.entity_description.native_unit_of_measurement is not None:
+            return self.entity_description.native_unit_of_measurement
+        return self._restored_unit

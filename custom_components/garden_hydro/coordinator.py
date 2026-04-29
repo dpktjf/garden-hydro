@@ -33,6 +33,7 @@ from .const import (
     CONF_TMIN_ENTITY_ID,
     CONF_WIND_SPEED_ENTITY_ID,
     DEFAULT_ROLLUP_TIME,
+    ETO_SOURCE_PENMAN_MONTEITH,
     MAX_FORECAST_RAIN_MM,
     MAX_HUMIDITY_PCT,
     MAX_RAIN_MM,
@@ -50,13 +51,18 @@ from .const import (
     WEATHER_MISSING_WIND_SPEED,
     WEATHER_OK,
     WEATHER_PARTIAL,
+    ZONE_STATUS_CAPPED,
+    ZONE_STATUS_DATA_UNAVAILABLE,
+    ZONE_STATUS_DISABLED,
+    ZONE_STATUS_NO_WATER_REQUIRED,
+    ZONE_STATUS_WATER_REQUIRED,
 )
 from .eto import (
     blended_ra_for_date,
     calculate_hargreaves_eto,
     calculate_penman_monteith_eto,
 )
-from .models import RuntimeData, SiteCalculationResult
+from .models import RuntimeData, SiteCalculationResult, ZoneCalculationResult
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -356,6 +362,12 @@ class GardenHydroCoordinator(DataUpdateCoordinator[SiteCalculationResult]):
             source_forecast_rain_entity_id=forecast_entity_id,
             tmean_c=tmean,
             temperature_delta_c=temperature_delta,
+            zone_results=self._calculate_zone_results(
+                eto_hargreaves_mm=eto_hargreaves_mm,
+                eto_penman_monteith_mm=eto_penman_monteith_mm,
+                rain_mm=rain,
+                forecast_rain_mm=forecast_rain,
+            ),
         )
 
     def _failed_result(
@@ -379,6 +391,76 @@ class GardenHydroCoordinator(DataUpdateCoordinator[SiteCalculationResult]):
             is_scheduled=is_scheduled,
             calc_mode=",".join(enabled_modes),
         )
+
+    def _calculate_zone_results(
+        self,
+        *,
+        eto_hargreaves_mm: float | None,
+        eto_penman_monteith_mm: float | None,
+        rain_mm: float,
+        forecast_rain_mm: float | None,
+    ) -> dict[str, ZoneCalculationResult]:
+        """Calculate advisory watering outputs for configured zones."""
+        results: dict[str, ZoneCalculationResult] = {}
+
+        for zone_slug, settings in self.runtime.zone_settings.items():
+            if not settings.enabled:
+                results[zone_slug] = ZoneCalculationResult(
+                    eto_source=settings.eto_source,
+                    status=ZONE_STATUS_DISABLED,
+                )
+
+                continue
+
+            selected_eto = (
+                eto_penman_monteith_mm if settings.eto_source == ETO_SOURCE_PENMAN_MONTEITH else eto_hargreaves_mm
+            )
+            if selected_eto is None:
+                results[zone_slug] = ZoneCalculationResult(
+                    eto_source=settings.eto_source,
+                    status=ZONE_STATUS_DATA_UNAVAILABLE,
+                )
+                continue
+
+            zone_eto = selected_eto * settings.border_factor
+            adjusted_need = max(
+                zone_eto * (1 + settings.manual_adjustment_pct / 100),
+                0,
+            )
+            effective_rain = rain_mm * settings.rain_effective_pct / 100
+            forecast_credit = (forecast_rain_mm or 0) * settings.forecast_credit_pct / 100
+            water_required = max(
+                adjusted_need - effective_rain - forecast_credit,
+                0,
+            )
+            runtime_min = (
+                60 * water_required / settings.application_rate_mm_per_hr
+                if settings.application_rate_mm_per_hr > 0
+                else 0
+            )
+            recommended_runtime = min(runtime_min, settings.max_runtime_min)
+
+            status = (
+                ZONE_STATUS_NO_WATER_REQUIRED
+                if water_required <= 0
+                else ZONE_STATUS_CAPPED
+                if runtime_min > settings.max_runtime_min
+                else ZONE_STATUS_WATER_REQUIRED
+            )
+            results[zone_slug] = ZoneCalculationResult(
+                eto_source=settings.eto_source,
+                selected_eto_mm=round(selected_eto, 2),
+                border_factor=round(settings.border_factor, 2),
+                zone_eto_mm=round(zone_eto, 2),
+                adjusted_need_mm=round(adjusted_need, 2),
+                effective_rain_mm=round(effective_rain, 2),
+                forecast_credit_mm=round(forecast_credit, 2),
+                water_required_mm=round(water_required, 2),
+                recommended_runtime_min=round(recommended_runtime, 1),
+                status=status,
+            )
+
+        return results
 
     def _read_required_numeric(  # noqa: PLR0913
         self,
