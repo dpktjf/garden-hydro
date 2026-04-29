@@ -63,6 +63,45 @@
       "reconfigure_successful": "Garden Hydro was updated successfully."
     }
   },
+  "config_subentries": {
+    "zone": {
+      "entry_type": "Watering zone",
+      "title": "Watering zone",
+      "initiate_flow": {
+        "user": "Add watering zone"
+      },
+      "step": {
+        "user": {
+          "title": "Add watering zone",
+          "description": "Configure an advisory watering zone.",
+          "data": {
+            "zone_name": "Zone name",
+            "zone_enabled": "Enabled",
+            "eto_source": "ETo source",
+            "border_type": "Border type",
+            "application_rate_mm_per_hr": "Application rate",
+            "max_runtime_min": "Maximum runtime"
+          }
+        },
+        "reconfigure": {
+          "title": "Update watering zone",
+          "description": "Update this advisory watering zone.",
+          "data": {
+            "zone_name": "Zone name",
+            "zone_enabled": "Enabled",
+            "eto_source": "ETo source",
+            "border_type": "Border type",
+            "application_rate_mm_per_hr": "Application rate",
+            "max_runtime_min": "Maximum runtime"
+          }
+        }
+      },
+      "error": {
+        "zone_name_required": "Enter a zone name.",
+        "zone_already_exists": "A zone with this name already exists."
+      }
+    }
+  },
   "entity": {
     "sensor": {
       "eto_hargreaves_mm": {

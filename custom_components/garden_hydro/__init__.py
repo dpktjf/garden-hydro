@@ -12,13 +12,26 @@ from homeassistant.helpers import config_validation as cv
 from .const import (
     ATTR_ENTRY_ID,
     CALC_MODE,
+    CONF_APPLICATION_RATE_MM_PER_HR,
+    CONF_BORDER_FACTOR,
+    CONF_BORDER_TYPE,
+    CONF_ETO_SOURCE,
+    CONF_FORECAST_CREDIT_PCT,
+    CONF_IRRIGATION_EFFICIENCY_PCT,
+    CONF_MANUAL_ADJUSTMENT_PCT,
+    CONF_MAX_RUNTIME_MIN,
+    CONF_RAIN_EFFECTIVE_PCT,
+    CONF_ZONE_ENABLED,
+    CONF_ZONE_NAME,
+    CONF_ZONE_SLUG,
     DOMAIN,
     PLATFORMS,
     RA_DEFAULTS,
     SERVICE_RECALCULATE_SITE,
+    SUBENTRY_TYPE_ZONE,
 )
 from .coordinator import GardenHydroCoordinator
-from .models import RuntimeData, SiteCalculationResult
+from .models import RuntimeData, SiteCalculationResult, ZoneSettings
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -74,6 +87,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     runtime = RuntimeData(
         ra_values=RA_DEFAULTS.copy(),
         result=SiteCalculationResult(calc_mode=CALC_MODE),
+        zone_settings=_zone_settings_from_subentries(entry),
     )
     coordinator = GardenHydroCoordinator(
         hass,
@@ -91,6 +105,32 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await coordinator.async_start()
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
+
+
+def _zone_settings_from_subentries(entry: ConfigEntry) -> dict[str, ZoneSettings]:
+    """Return watering zone settings from config subentries."""
+    zones: dict[str, ZoneSettings] = {}
+    for subentry in entry.subentries.values():
+        if subentry.subentry_type != SUBENTRY_TYPE_ZONE:
+            continue
+
+        data = subentry.data
+        zone_slug = str(data[CONF_ZONE_SLUG])
+        zones[zone_slug] = ZoneSettings(
+            zone_name=str(data[CONF_ZONE_NAME]),
+            zone_slug=zone_slug,
+            enabled=bool(data[CONF_ZONE_ENABLED]),
+            eto_source=str(data[CONF_ETO_SOURCE]),
+            border_type=str(data[CONF_BORDER_TYPE]),
+            border_factor=float(data[CONF_BORDER_FACTOR]),
+            application_rate_mm_per_hr=float(data[CONF_APPLICATION_RATE_MM_PER_HR]),
+            max_runtime_min=float(data[CONF_MAX_RUNTIME_MIN]),
+            rain_effective_pct=float(data[CONF_RAIN_EFFECTIVE_PCT]),
+            forecast_credit_pct=float(data[CONF_FORECAST_CREDIT_PCT]),
+            irrigation_efficiency_pct=float(data[CONF_IRRIGATION_EFFICIENCY_PCT]),
+            manual_adjustment_pct=float(data[CONF_MANUAL_ADJUSTMENT_PCT]),
+        )
+    return zones
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
