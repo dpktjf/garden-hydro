@@ -365,15 +365,17 @@ class GardenHydroZoneSubentryFlow(ConfigSubentryFlow):
                     CONF_BORDER_FACTOR: BORDER_TYPE_FACTORS[border_type],
                     CONF_APPLICATION_RATE_MM_PER_HR: user_input[CONF_APPLICATION_RATE_MM_PER_HR],
                     CONF_MAX_RUNTIME_MIN: user_input[CONF_MAX_RUNTIME_MIN],
-                    CONF_RAIN_EFFECTIVE_PCT: DEFAULT_RAIN_EFFECTIVE_PCT,
-                    CONF_FORECAST_CREDIT_PCT: DEFAULT_FORECAST_CREDIT_PCT,
-                    CONF_IRRIGATION_EFFICIENCY_PCT: DEFAULT_IRRIGATION_EFFICIENCY_PCT,
-                    CONF_MANUAL_ADJUSTMENT_PCT: DEFAULT_MANUAL_ADJUSTMENT_PCT,
+                    CONF_RAIN_EFFECTIVE_PCT: user_input[CONF_RAIN_EFFECTIVE_PCT],
+                    CONF_FORECAST_CREDIT_PCT: user_input[CONF_FORECAST_CREDIT_PCT],
+                    CONF_IRRIGATION_EFFICIENCY_PCT: user_input[CONF_IRRIGATION_EFFICIENCY_PCT],
+                    CONF_MANUAL_ADJUSTMENT_PCT: user_input[CONF_MANUAL_ADJUSTMENT_PCT],
                 }
-                return self.async_create_entry(
+                result = self.async_create_entry(
                     title=zone_name,
                     data=self._zone_data,
                 )
+                await self.hass.config_entries.async_reload(self._get_entry().entry_id)
+                return result
 
         return self.async_show_form(
             step_id="user",
@@ -405,6 +407,10 @@ class GardenHydroZoneSubentryFlow(ConfigSubentryFlow):
                     CONF_BORDER_FACTOR: BORDER_TYPE_FACTORS[border_type],
                     CONF_APPLICATION_RATE_MM_PER_HR: user_input[CONF_APPLICATION_RATE_MM_PER_HR],
                     CONF_MAX_RUNTIME_MIN: user_input[CONF_MAX_RUNTIME_MIN],
+                    CONF_RAIN_EFFECTIVE_PCT: user_input[CONF_RAIN_EFFECTIVE_PCT],
+                    CONF_FORECAST_CREDIT_PCT: user_input[CONF_FORECAST_CREDIT_PCT],
+                    CONF_IRRIGATION_EFFICIENCY_PCT: user_input[CONF_IRRIGATION_EFFICIENCY_PCT],
+                    CONF_MANUAL_ADJUSTMENT_PCT: user_input[CONF_MANUAL_ADJUSTMENT_PCT],
                     CONF_ZONE_SLUG: zone_slug,
                 }
                 return self.async_update_reload_and_abort(
@@ -476,6 +482,66 @@ class GardenHydroZoneSubentryFlow(ConfigSubentryFlow):
                         step=1,
                         mode=selector.NumberSelectorMode.BOX,
                         unit_of_measurement="min",
+                    )
+                ),
+                vol.Required(
+                    CONF_RAIN_EFFECTIVE_PCT,
+                    default=current.get(
+                        CONF_RAIN_EFFECTIVE_PCT,
+                        DEFAULT_RAIN_EFFECTIVE_PCT,
+                    ),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=0,
+                        max=100,
+                        step=1,
+                        mode=selector.NumberSelectorMode.BOX,
+                        unit_of_measurement="%",
+                    )
+                ),
+                vol.Required(
+                    CONF_FORECAST_CREDIT_PCT,
+                    default=current.get(
+                        CONF_FORECAST_CREDIT_PCT,
+                        DEFAULT_FORECAST_CREDIT_PCT,
+                    ),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=0,
+                        max=100,
+                        step=1,
+                        mode=selector.NumberSelectorMode.BOX,
+                        unit_of_measurement="%",
+                    )
+                ),
+                vol.Required(
+                    CONF_IRRIGATION_EFFICIENCY_PCT,
+                    default=current.get(
+                        CONF_IRRIGATION_EFFICIENCY_PCT,
+                        DEFAULT_IRRIGATION_EFFICIENCY_PCT,
+                    ),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=1,
+                        max=100,
+                        step=1,
+                        mode=selector.NumberSelectorMode.BOX,
+                        unit_of_measurement="%",
+                    )
+                ),
+                vol.Required(
+                    CONF_MANUAL_ADJUSTMENT_PCT,
+                    default=current.get(
+                        CONF_MANUAL_ADJUSTMENT_PCT,
+                        DEFAULT_MANUAL_ADJUSTMENT_PCT,
+                    ),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=-100,
+                        max=100,
+                        step=1,
+                        mode=selector.NumberSelectorMode.BOX,
+                        unit_of_measurement="%",
                     )
                 ),
             }

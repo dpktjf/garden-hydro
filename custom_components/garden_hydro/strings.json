@@ -80,7 +80,18 @@
             "eto_source": "ETo source",
             "border_type": "Border type",
             "application_rate_mm_per_hr": "Application rate",
-            "max_runtime_min": "Maximum runtime"
+            "max_runtime_min": "Maximum runtime",
+            "rain_effective_pct": "Rain effectiveness",
+            "forecast_credit_pct": "Forecast credit",
+            "irrigation_efficiency_pct": "Irrigation efficiency",
+            "manual_adjustment_pct": "Manual adjustment"
+          },
+          "data_description": {
+            "border_type": "Increase if more water needed; decrease otherwise",
+            "rain_effective_pct": "50-70 heavy clay, 70-85 normal, 85-95 sandy/free draining; increase when soil drains quickly; decrease when runoff occurs",
+            "forecast_credit_pct": "0-30 unreliable, 40-60 moderate confidence, 70-80 high; increase when forecast reliability high",
+            "irrigation_efficiency_pct": "50-60 overhead sprinklers, 70-80 spray, 85-95 drip; increase when distribution uniform and little wind",
+            "manual_adjustment_pct": "-20 reduce watering, 0 normal, +20 increase; use in heatwave or season transition"
           }
         },
         "reconfigure": {
@@ -92,7 +103,18 @@
             "eto_source": "ETo source",
             "border_type": "Border type",
             "application_rate_mm_per_hr": "Application rate",
-            "max_runtime_min": "Maximum runtime"
+            "max_runtime_min": "Maximum runtime",
+            "rain_effective_pct": "Rain effectiveness",
+            "forecast_credit_pct": "Forecast credit",
+            "irrigation_efficiency_pct": "Irrigation efficiency",
+            "manual_adjustment_pct": "Manual adjustment"
+          },
+          "data_description": {
+            "border_type": "Increase if more water needed; decrease otherwise",
+            "rain_effective_pct": "50-70 heavy clay, 70-85 normal, 85-95 sandy/free draining; increase when soil drains quickly; decrease when runoff occurs",
+            "forecast_credit_pct": "0-30 unreliable, 40-60 moderate confidence, 70-80 high; increase when forecast reliability high",
+            "irrigation_efficiency_pct": "50-60 overhead sprinklers, 70-80 spray, 85-95 drip; increase when distribution uniform and little wind",
+            "manual_adjustment_pct": "-20 reduce watering, 0 normal, +20 increase; use in heatwave or season transition"
           }
         }
       },
