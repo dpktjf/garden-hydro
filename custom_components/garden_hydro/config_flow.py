@@ -374,7 +374,9 @@ class GardenHydroZoneSubentryFlow(ConfigSubentryFlow):
                     title=zone_name,
                     data=self._zone_data,
                 )
-                await self.hass.config_entries.async_reload(self._get_entry().entry_id)
+                self.hass.async_create_task(
+                    self.hass.config_entries.async_reload(self._get_entry().entry_id)
+                )
                 return result
 
         return self.async_show_form(
